@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Decentralized Resume Verifier</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      padding: 30px;
+    }
+    h2 {
+      color: #2c3e50;
+    }
+    input, button {
+      padding: 10px;
+      margin-top: 10px;
+      display: block;
+      width: 300px;
+    }
+    #output {
+      margin-top: 20px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Decentralized Resume & Skill Verification</h2>
+  <button onclick="connectWallet()">Connect MetaMask</button>
+  <p id="walletAddress">Wallet: Not connected</p>
+
+  <label for="resumeFile">Upload Resume (PDF)</label>
+  <input type="file" id="resumeFile" />
+  <button onclick="uploadResume()">Upload to IPFS and Submit</button>
+
+  <div id="output"></div>
+
+  <script>
+    let web3;
+    let contract;
+
+    const contractAddress = 'PASTE_YOUR_CONTRACT_ADDRESS_HERE'; // Replace this
+    const contractABI = [
+      {
+        "inputs": [{ "internalType": "string", "name": "ipfsHash", "type": "string" }],
+        "name": "uploadResume",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [{ "internalType": "address", "name": "user", "type": "address" }],
+        "name": "getResumes",
+        "outputs": [{ "internalType": "string[]", "name": "", "type": "string[]" }],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        await window.ethereum.enable();
+        const accounts = await web3.eth.getAccounts();
+        document.getElementById("walletAddress").innerText = `Wallet: ${accounts[0]}`;
+        contract = new web3.eth.Contract(contractABI, contractAddress);
+      } else {
+        alert("Please install MetaMask!");
+      }
+    }
+
+    async function uploadToIPFS(file) {
+      const apiToken = "PASTE_YOUR_WEB3_STORAGE_API_KEY_HERE"; // Replace this
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch("https://api.web3.storage/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      return result.cid;
+    }
+
+    async function uploadResume() {
+      const fileInput = document.getElementById("resumeFile");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please select a resume file first.");
+        return;
+      }
+
+      document.getElementById("output").innerText = "Uploading to IPFS...";
+      const cid = await uploadToIPFS(file);
+      const ipfsURL = `https://ipfs.io/ipfs/${cid}`;
+
+      const accounts = await web3.eth.getAccounts();
+      await contract.methods.uploadResume(cid).send({ from: accounts[0] });
+
+      document.getElementById("output").innerHTML = `
+        ✅ Uploaded to IPFS<br>
+        IPFS Hash: <a href="${ipfsURL}" target="_blank">${cid}</a>
+      `;
+    }
+  </script>
+
+</body>
+</html>
